@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practica de Lectura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Baloo+2:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, .sentence-text {
+            font-family: 'Baloo 2', cursive;
+        }
+        .feedback-correct {
+            color: #22c55e; /* green-500 */
+        }
+        .feedback-almost {
+            color: #f59e0b; /* amber-500 */
+        }
+        .feedback-retry {
+            color: #ef4444; /* red-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white w-full max-w-2xl mx-4 p-6 sm:p-8 rounded-2xl shadow-lg text-center">
+        
+        <!-- Título -->
+        <h1 class="text-4xl sm:text-5xl font-bold text-blue-600 mb-4">¡A practicar la lectura!</h1>
+        <p class="text-gray-600 mb-8">Presiona el micrófono, lee la frase en voz alta y mira tu resultado.</p>
+
+        <!-- Tarjeta con la frase a leer -->
+        <div class="bg-blue-50 p-6 rounded-xl border-2 border-blue-200 mb-8">
+            <p id="sentence" class="sentence-text text-2xl sm:text-3xl text-gray-800" style="min-height: 80px; display: flex; align-items: center; justify-content: center;">
+                <!-- La frase aparecerá aquí -->
+            </p>
+        </div>
+
+        <!-- Botón para grabar -->
+        <div class="mb-8">
+            <button id="recordButton" class="bg-blue-600 text-white rounded-full w-24 h-24 flex items-center justify-center mx-auto transition-transform transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300 shadow-lg">
+                <i id="recordIcon" class="fas fa-microphone text-4xl"></i>
+            </button>
+        </div>
+
+        <!-- Área de resultados y feedback -->
+        <div id="resultArea" class="hidden space-y-4">
+            <div>
+                <h2 class="font-bold text-lg text-gray-700">Tú leíste:</h2>
+                <p id="recognizedText" class="text-gray-600 text-lg italic">...</p>
+            </div>
+            <div>
+                <h2 class="font-bold text-lg text-gray-700">Resultado:</h2>
+                <p id="feedback" class="text-xl font-semibold">...</p>
+            </div>
+        </div>
+
+        <!-- Botón para nueva frase -->
+        <div class="mt-8">
+            <button id="newSentenceButton" class="bg-gray-200 text-gray-800 font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors">
+                Otra Frase
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Elementos del DOM ---
+        const sentenceEl = document.getElementById('sentence');
+        const recordButton = document.getElementById('recordButton');
+        const recordIcon = document.getElementById('recordIcon');
+        const recognizedTextEl = document.getElementById('recognizedText');
+        const feedbackEl = document.getElementById('feedback');
+        const newSentenceButton = document.getElementById('newSentenceButton');
+        const resultArea = document.getElementById('resultArea');
+
+        // --- Frases para practicar ---
+        const sentences = [
+            "El sol brilla en el cielo azul.",
+            "La mariposa vuela entre las flores.",
+            "El perro corre rápido en el parque.",
+            "Mi amigo y yo jugamos con la pelota.",
+            "El gato duerme en el sofá cómodo.",
+            "La luna ilumina la noche oscura.",
+            "Los pájaros cantan en los árboles.",
+            "Me gusta comer helado de chocolate.",
+            "El coche rojo es muy bonito.",
+            "Mi mamá me lee un cuento antes de dormir.",
+            "La abeja hace miel en la colmena.",
+            "El barco navega por el mar grande.",
+            "La bicicleta azul está en el jardín.",
+            "El conejo come zanahorias frescas.",
+            "Un delfín salta fuera del agua.",
+            "El elefante tiene orejas muy grandes.",
+            "La foca juega con una pelota roja.",
+            "El gallo canta por la mañana.",
+            "Un hipopótamo se baña en el río.",
+            "La jirafa tiene el cuello muy largo.",
+            "El león es el rey de la selva.",
+            "La manzana es mi fruta favorita.",
+            "El nido tiene tres huevos pequeños.",
+            "El oso pardo busca bayas para comer.",
+            "El pez nada en el agua clara.",
+            "La rana salta de hoja en hoja.",
+            "El sapo croa cerca del estanque.",
+            "La tortuga camina muy despacio.",
+            "El tren viaja por las montañas.",
+            "Las uvas moradas son muy dulces.",
+            "La vaca nos da leche fresca.",
+            "El zorro astuto se esconde en el bosque.",
+            "Mi abuela hornea galletas deliciosas.",
+            "El payaso del circo es muy gracioso.",
+            "El avión vuela alto sobre las nubes.",
+            "Construyo un castillo de arena en la playa.",
+            "El bombero apaga el fuego con agua.",
+            "La maestra nos enseña cosas nuevas.",
+            "El doctor cuida a las personas enfermas.",
+            "Me encanta dibujar con lápices de colores."
+        ];
+
+        let currentSentence = '';
+        let recognition;
+
+        // --- Inicialización del Reconocimiento de Voz ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'es-ES'; // Español de España
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            // --- Eventos del Reconocimiento ---
+            recognition.onstart = () => {
+                recordIcon.classList.remove('fa-microphone');
+                recordIcon.classList.add('fa-stop');
+                recordButton.classList.add('bg-red-500');
+                recordButton.classList.remove('bg-blue-600');
+                feedbackEl.textContent = 'Escuchando...';
+                feedbackEl.className = 'text-xl font-semibold text-gray-500';
+                resultArea.classList.remove('hidden');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                recognizedTextEl.textContent = transcript;
+                evaluateReading(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Error en el reconocimiento de voz:", event.error);
+                feedbackEl.textContent = 'No pude escucharte. ¿Puedes intentarlo de nuevo?';
+                feedbackEl.className = 'text-xl font-semibold feedback-retry';
+            };
+
+            recognition.onend = () => {
+                recordIcon.classList.remove('fa-stop');
+                recordIcon.classList.add('fa-microphone');
+                recordButton.classList.remove('bg-red-500');
+                recordButton.classList.add('bg-blue-600');
+            };
+
+        } else {
+            // Si el navegador no es compatible
+            sentenceEl.textContent = "Tu navegador no soporta el reconocimiento de voz. Prueba con Google Chrome.";
+            recordButton.disabled = true;
+            newSentenceButton.disabled = true;
+        }
+
+        // --- Lógica de la aplicación ---
+
+        /**
+         * Muestra una nueva frase aleatoria en la pantalla.
+         */
+        function displayNewSentence() {
+            const randomIndex = Math.floor(Math.random() * sentences.length);
+            currentSentence = sentences[randomIndex];
+            sentenceEl.textContent = currentSentence;
+            resultArea.classList.add('hidden'); // Oculta resultados anteriores
+        }
+
+        /**
+         * Normaliza un texto para la comparación (minúsculas y sin puntuación).
+         * @param {string} text - El texto a normalizar.
+         * @returns {string} El texto normalizado.
+         */
+        function normalizeText(text) {
+            return text.toLowerCase().replace(/[.,¡!¿?]/g, '').trim();
+        }
+
+        /**
+         * Compara el texto original con el leído y da feedback.
+         * @param {string} recognizedSpeech - El texto capturado por el micrófono.
+         */
+        function evaluateReading(recognizedSpeech) {
+            const originalNormalized = normalizeText(currentSentence);
+            const recognizedNormalized = normalizeText(recognizedSpeech);
+
+            if (originalNormalized === recognizedNormalized) {
+                feedbackEl.textContent = '¡Excelente! ¡Lo leíste perfecto!';
+                feedbackEl.className = 'text-xl font-semibold feedback-correct';
+            } else {
+                // Una simple comprobación de similitud
+                const originalWords = originalNormalized.split(' ');
+                const recognizedWords = recognizedNormalized.split(' ');
+                const correctWords = originalWords.filter(word => recognizedWords.includes(word));
+                const similarity = correctWords.length / originalWords.length;
+
+                if (similarity > 0.7) {
+                    feedbackEl.textContent = '¡Muy bien! Casi perfecto.';
+                    feedbackEl.className = 'text-xl font-semibold feedback-almost';
+                } else {
+                    feedbackEl.textContent = '¡Sigue intentando! La práctica hace al maestro.';
+                    feedbackEl.className = 'text-xl font-semibold feedback-retry';
+                }
+            }
+        }
+
+        // --- Event Listeners de los botones ---
+        recordButton.addEventListener('click', () => {
+            if (recognition) {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.error("El reconocimiento ya estaba iniciado.", e);
+                }
+            }
+        });
+
+        newSentenceButton.addEventListener('click', displayNewSentence);
+
+        // --- Carga inicial ---
+        window.onload = () => {
+            displayNewSentence();
+        };
+    </script>
+</body>
+</html>
+
